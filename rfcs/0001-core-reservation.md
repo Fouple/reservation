@@ -106,17 +106,16 @@ message QueryRequest {
     google.protobuf.Timestamp end = 5;
 }
 
-message ListenRequest {
-
-}
+message ListenRequest {}
 
 message ListenResponse {
-
+    ReservationUpdateType op = 1;
+    Reservation reservation = 2;
 }
 
 service ReservationService {
     rpc reserve(ReserveRequest) returns (ReserveResponse);
-    rpc confirm(ConfirmRequest) return (ConfirmResponse);
+    rpc confirm(ConfirmRequest) returns (ConfirmResponse);
     rpc update(UpdateRequest) returns (UpdateResponse);
     rpc cancel(CancelRequest) returns (CancelResponse);
     rpc get(GetRequest) returns (GetResponse);
@@ -210,7 +209,7 @@ We also use a triiger to notify a channel when a reservation is added/updated/de
 
 [reference-level-explanation]: #reference-level-explanation
 
-TODO
+TDB
 
 ## Drawbacks
 
@@ -234,10 +233,13 @@ N/A
 
 [unresolved-questions]: #unresolved-questions
 
-N/A
+- how to handle repeated reservations? - is this more or less a business logic which shouldn't be put into this layer?(non-goal: we consider this is a business logic and should be handled by the caller)
+- if load is big, we may use an external queue for recording changes.
+- we haven't considered tracking/observability/deployment yet.
+- query performance might be an issue - need to revisit the index and also consider using cache.
 
 ## Future possibilities
 
 [future-possibilities]: #future-possibilities
 
-N/A
+TDB
