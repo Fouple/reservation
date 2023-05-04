@@ -108,10 +108,10 @@ pub struct QueryRequest {
     /// user status to filter result, If UNKNOWN, return all reservations
     #[prost(enumeration = "ReservationStatus", tag = "3")]
     pub status: i32,
-    /// start time for the reservation query, if 0, use Infinty for start time
+    /// start time for the reservation query, if 0, use Infinity for start time
     #[prost(message, optional, tag = "4")]
     pub start: ::core::option::Option<::prost_types::Timestamp>,
-    /// end time for the reservation query, if 0, use Infinty for end time
+    /// end time for the reservation query, if 0, use Infinity for end time
     #[prost(message, optional, tag = "5")]
     pub end: ::core::option::Option<::prost_types::Timestamp>,
 }

@@ -99,9 +99,9 @@ message QueryRequest {
     string user_id = 2;
     // user status to filter result, If UNKNOWN, return all reservations
     ReservationStatus status = 3;
-    // start time for the reservation query, if 0, use Infinty for start time
+    // start time for the reservation query, if 0, use Infinity for start time
     google.protobuf.Timestamp start = 4;
-    // end time for the reservation query, if 0, use Infinty for end time
+    // end time for the reservation query, if 0, use Infinity for end time
     google.protobuf.Timestamp end = 5;
 }
 
