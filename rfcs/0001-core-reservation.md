@@ -131,26 +131,28 @@ service ReservationService {
 We use postgres as the database. Below is the schema:
 
 ```sql
-CREATE SCHEME rsvp;
-CREATE TYPE  rsvp.reservation_status AS ENUM ('unknown', 'pending', 'confirmed', 'blocked');
-CREATE TYPE  rsvp.reservation_update_type AS ENUM ('unknown', 'create', 'update', 'delete');
+CREATE SCHEMA rsvp;
 
-CREATE TABLE rsvp.reservations {
-    id uuid NOT NULL DEFAULT uuid_generate_v4(),
-    user_id varchar(64) NOT NULL,
+CREATE EXTENSION btree_gist;
+
+CREATE TYPE rsvp.reservation_status AS ENUM ('unknown', 'pending', 'confirmed', 'blocked');
+CREATE TYPE rsvp.reservation_update_type AS ENUM ('unknown', 'create', 'update', 'delete');
+
+CREATE TABLE rsvp.reservations (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    user_id VARCHAR(64) NOT NULL,
     status rsvp.reservation_status NOT NULL DEFAULT 'pending',
 
-    resource_id varchar(64) NOT NULL,
-    timespan tstzrange NOT NULL,
-
-    note text,
+    resource_id VARCHAR(64) NOT NULL,
+    timespan TSTZRANGE NOT NULL,
     create_at timestamp with time zone NOT NULL DEFAULT now(),
     update_at timestamp with time zone NOT NULL DEFAULT now(),
 
+    note TEXT,
+
     CONSTRAINT reservations_pkey PRIMARY KEY (id),
     CONSTRAINT reservations_conflict EXCLUDE USING gist (resource_id WITH =, timespan WITH &&)
-};
-
+);
 CREATE INDEX reservations_resource_id_idx ON rsvp.reservations (resource_id);
 CREATE INDEX reservations_user_id_idx ON rsvp.reservations (user_id);
 
@@ -158,18 +160,31 @@ CREATE INDEX reservations_user_id_idx ON rsvp.reservations (user_id);
 -- if resource_id is null, find all reservations within during for the user
 -- if both are null, find all reservations within during
 -- if both set, find all reservations within during for the resource and user
-CREATE OR REPLACE FUNCTION rsvp.query(uid text, rid text, during: TSTZRANGE) RETURNS TABLE rsvp.reservations AS $$ $$ LANGUAGE plpgsql;
+CREATE OR REPLACE FUNCTION rsvp.query(uid text, rid text, during TSTZRANGE) RETURNS TABLE (LIKE rsvp.reservations)
+AS $$
+BEGIN
+    IF uid IS NULL AND rid IS NULL THEN
+        RETURN QUERY SELECT * FROM rsvp.reservations WHERE during && timespan;
+    ELSEIF uid IS NULL THEN
+        RETURN QUERY SELECT * FROM rsvp.reservations WHERE resource_id = rid AND during @> timespan;
+    ELSEIF rid IS NULL THEN
+        RETURN QUERY SELECT * FROM rsvp.reservations WHERE user_id = uid AND during @> timespan;
+    ELSE
+        RETURN QUERY SELECT * FROM rsvp.reservations WHERE resource_id = rid AND user_id = uid AND during @> timespan;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
 
 -- reservation change queue
-CREATE TABLE rsvp.reservation_changes {
+CREATE TABLE rsvp.reservation_changes (
     id SERIAL NOT NULL,
-    reservation_id NOT NULL,
-    op rsvp.reservation_update_type NOT NULL,
-};
+    reservation_id uuid NOT NULL,
+    op rsvp.reservation_update_type NOT NULL
+);
 
 -- trigger for add/update/delete reservation
-CREATE OR REPLACE FUNCTION rsvp.reservation_trigger() RETURNS TRIGGER AS
-$$
+CREATE OR REPLACE FUNCTION rsvp.reservations_trigger() RETURNS TRIGGER
+AS $$
 BEGIN
     IF TG_OP = 'INSERT' THEN
         INSERT INTO rsvp.reservation_changes (reservation_id, op) VALUES (NEW.id, 'create');
@@ -188,7 +203,7 @@ $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER reservations_trigger
     AFTER INSERT OR UPDATE OR DELETE ON rsvp.reservations
-    FOR EACH ROW EXECUTE PROCEDURE rsvp.reservation_trigger()
+    FOR EACH ROW EXECUTE PROCEDURE rsvp.reservations_trigger();
 ```
 
 Here we use EXCLUDE constraint provided by postgres to ensure that on overlapping reservations cannot be mad for a given resource at given time.
